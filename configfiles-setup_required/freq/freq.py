@@ -69,7 +69,6 @@ kvj"q-(1.`xz2*345&_6907{[$8?,!@#;~)=:",
 
   def tally_str(self,line,weight=1):
       """tally_str() accepts two parameters.  A string and optionally you can specify a weight."""
-      wordcount=0
       if self.ignorecase:
           line=line.lower()
       for char in range(len(line)-1):
@@ -79,17 +78,18 @@ kvj"q-(1.`xz2*345&_6907{[$8?,!@#;~)=:",
               self[line[char]][line[char+1]]=self[line[char]][line[char+1]]+(1*weight)
           else:
               self[line[char]][line[char+1]]=weight
-      return wordcount
+      return 0
 
   def probability(self,string,max_prob=40):
       """This function tells you how probable the letter combination provided is giving the character frequencies. Ex .probability("test") returns ~%35 """
-      probs=[]
-      for pos,ch in enumerate(string[:-1]):
-          if not ch in self.ignorechars and not string[pos+1] in self.ignorechars:
-              probs.append( self._probability(ch,string[pos+1],max_prob) )
-      if len(probs)==0:
-          return 0
-      return sum(probs) / len(probs)
+      probs = [
+          self._probability(ch, string[pos + 1], max_prob)
+          for pos, ch in enumerate(string[:-1])
+          if ch not in self.ignorechars
+          and string[pos + 1] not in self.ignorechars
+      ]
+
+      return sum(probs) / len(probs) if probs else 0
 
   def printtable(self):
       """ Prints the frequency tables as a python function that can be used to lookup the characters that follow a character.  You can plug the resulting script into a python program to lookup the most frequent character to follow another character.  For example you can call "lookupfreq("q")" and it will return a string containing all the characters in frequency order such as "ustrnalq1f"   where "u" is the most frequenct character to follow "q" and "f" is the least frequent.
@@ -124,9 +124,7 @@ kvj"q-(1.`xz2*345&_6907{[$8?,!@#;~)=:",
       if not self.has_key(top):
           return 0
       all_letter_count = sum(self[top].values())
-      char2_count = 0
-      if self[top].has_key(sub):
-          char2_count = self[top][sub]
+      char2_count = self[top][sub] if self[top].has_key(sub) else 0
       probab = float(char2_count)/float(all_letter_count)*100
       if probab > max_prob:
           probab = max_prob

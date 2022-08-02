@@ -37,17 +37,21 @@ class freqapi(BaseHTTPServer.BaseHTTPRequestHandler):
             cmdstr = re.search(r"[\/](measure|normal|alexa|domain)[\/].*$", urlpath)
             tgtstr = re.search(r"[\/](measure|normal|alexa|domain)[\/](.*)$", urlpath)
             if not cmdstr or not tgtstr:
-                self.wfile.write('<html><body>API Documentation<br> http://%s:%s/?cmd=measure&tgt=&ltstring&gt <br> http://%s:%s/?cmd=normal&tgt=&ltstring&gt <br> http://%s:%s/?cmd=normal&tgt=&ltstring&gt&weight=&ltweight&gt </body></html>' % (self.server.server_address[0], self.server.server_address[1],self.server.server_address[0], self.server.server_address[1],self.server.server_address[0], self.server.server_address[1]))
+                self.wfile.write(
+                    f'<html><body>API Documentation<br> http://{self.server.server_address[0]}:{self.server.server_address[1]}/?cmd=measure&tgt=&ltstring&gt <br> http://{self.server.server_address[0]}:{self.server.server_address[1]}/?cmd=normal&tgt=&ltstring&gt <br> http://{self.server.server_address[0]}:{self.server.server_address[1]}/?cmd=normal&tgt=&ltstring&gt&weight=&ltweight&gt </body></html>'
+                )
+
                 return
-            params = {}
-            params["cmd"] = cmdstr.group(1)
-            params["tgt"] = tgtstr.group(2)
+            params = {"cmd": cmdstr[1], "tgt": tgtstr[2]}
             print(params)
         else:
             cmdstr=re.search("cmd=(?:measure|normal|alexa|domain)",urlparams)
             tgtstr =  re.search("tgt=",urlparams)
             if not cmdstr or not tgtstr:
-                self.wfile.write('<html><body>API Documentation<br> http://%s:%s/?cmd=measure&tgt=&ltstring&gt <br> http://%s:%s/?cmd=normal&tgt=&ltstring&gt <br> http://%s:%s/?cmd=normal&tgt=&ltstring&gt&weight=&ltweight&gt </body></html>' % (self.server.server_address[0], self.server.server_address[1],self.server.server_address[0], self.server.server_address[1],self.server.server_address[0], self.server.server_address[1]))
+                self.wfile.write(
+                    f'<html><body>API Documentation<br> http://{self.server.server_address[0]}:{self.server.server_address[1]}/?cmd=measure&tgt=&ltstring&gt <br> http://{self.server.server_address[0]}:{self.server.server_address[1]}/?cmd=normal&tgt=&ltstring&gt <br> http://{self.server.server_address[0]}:{self.server.server_address[1]}/?cmd=normal&tgt=&ltstring&gt&weight=&ltweight&gt </body></html>'
+                )
+
                 return
             params={}
             try:
@@ -71,7 +75,7 @@ class freqapi(BaseHTTPServer.BaseHTTPRequestHandler):
                 self.server.dirty_fc = True
             finally:
                 self.server.fc_lock.release()
-            self.wfile.write('<html><body>Frequency Table updated</body></html>') 
+            self.wfile.write('<html><body>Frequency Table updated</body></html>')
         elif params["cmd"] == "measure":
             if self.server.cache.has_key(params["tgt"]):
                 if self.server.verbose: self.server.safe_print ("Query from cache:", params["tgt"])
@@ -92,11 +96,12 @@ class freqapi(BaseHTTPServer.BaseHTTPRequestHandler):
                 if self.server.verbose: self.server.safe_print ("No Alexa data loaded. Restart program.")
                 self.wfile.write("Alexa not loaded on server. Restart server with -a or --alexa and file path.")
             else:
-                if self.server.verbose: self.server.safe_print ("Alexa queried for:%s" % (params['tgt']))              
+                if self.server.verbose:
+                    self.server.safe_print(f"Alexa queried for:{params['tgt']}")
                 self.wfile.write(str(self.server.alexa.get(params["tgt"],"NOT FOUND")))
         elif params["cmd"] == "domain":
             self.wfile.write("Not Implemented Yet.")
-        
+
         return
     def log_message(self, format, *args):
         return
@@ -132,8 +137,7 @@ class ThreadedFreqServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer, Ba
                 self.dirty_fc = False
             finally:
                 self.fc_lock.release()
-        else:
-            if self.verbose: self.safe_print ("Frequency counter not changed.  Not Saving to disk.")
+        elif self.verbose: self.safe_print ("Frequency counter not changed.  Not Saving to disk.")
         #Reschedule yourself
         if not self.exitthread.isSet():
             self.timer = threading.Timer(60*save_interval, self.save_freqtable, args = (save_path,save_interval))
@@ -156,27 +160,30 @@ def main():
     server.fc.load(args.freq_table)
     if args.alexa:
         if not os.path.exists(args.alexa):
-            print("Alexa file not found %s" % (args.alexa))
+            print(f"Alexa file not found {args.alexa}")
         else:
             try:
                 server.alexa = dict([(a,b) for b,a in re.findall(r"^(\d+),(.*)", open(args.alexa).read(), re.MULTILINE)])
             except Exception as e:
-                print("Unable to parse alexa file:%s" % (str(e)))
+                print(f"Unable to parse alexa file:{str(e)}")
     server.verbose = args.verbose
     #Schedule the first save interval unless save_interval was set to 0.
     if args.save_interval:
         server.timer = threading.Timer(60 *args.save_interval, server.save_freqtable, args = (args.freq_table, args.save_interval))
         server.timer.start()
- 
+
     #start the server
-    print('Server is Ready. http://%s:%s/?cmd=measure&tgt=astring' % (args.address, args.port))
+    print(
+        f'Server is Ready. http://{args.address}:{args.port}/?cmd=measure&tgt=astring'
+    )
+
     print('[?] - Remember: If you are going to call the api with wget, curl or something else from the bash prompt you need to escape the & with \& \n\n')
     while True:
         try:
             server.handle_request()
         except KeyboardInterrupt:
             break
-        
+
     server.safe_print("Control-C hit: Exiting server...")
     server.safe_print("Web API Disabled...")
     if server.dirty_fc:

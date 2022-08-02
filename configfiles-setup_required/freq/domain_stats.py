@@ -16,7 +16,7 @@ import datetime
 try:
     import whois
 except Exception as e:
-    print(str(e))
+    print(e)
     print("You need to install the Python whois module.  Install PIP (https://bootstrap.pypa.io/get-pip.py).  Then 'pip install python-whois' ")
     sys.exit(0)
 
@@ -34,14 +34,15 @@ class domain_api(BaseHTTPServer.BaseHTTPRequestHandler):
             if not cmdstr or not tgtstr:
                 self.wfile.write('<html><body>API Documentation<br> http://%s:%s/cmd/tgt <br> cmd = domain, alexa or created <br> tgt = domain name </body></html>' % (self.server.server_address[0], self.server.server_address[1],self.server.server_address[0], self.server.server_address[1],self.server.server_address[0], self.server.server_address[1]))
                 return
-            params = {}
-            params["cmd"] = cmdstr.group(1)
-            params["tgt"] = tgtstr.group(2)
+            params = {"cmd": cmdstr[1], "tgt": tgtstr[2]}
         else:
             cmdstr=re.search("cmd=(?:domain|alexa|created)",urlparams)
             tgtstr =  re.search("tgt=",urlparams)
             if not cmdstr or not tgtstr:
-                self.wfile.write('<html><body>API Documentation<br> http://%s:%s/?cmd=measure&tgt=&ltstring&gt <br> http://%s:%s/?cmd=normal&tgt=&ltstring&gt <br> http://%s:%s/?cmd=normal&tgt=&ltstring&gt&weight=&ltweight&gt </body></html>' % (self.server.server_address[0], self.server.server_address[1],self.server.server_address[0], self.server.server_address[1],self.server.server_address[0], self.server.server_address[1]))
+                self.wfile.write(
+                    f'<html><body>API Documentation<br> http://{self.server.server_address[0]}:{self.server.server_address[1]}/?cmd=measure&tgt=&ltstring&gt <br> http://{self.server.server_address[0]}:{self.server.server_address[1]}/?cmd=normal&tgt=&ltstring&gt <br> http://{self.server.server_address[0]}:{self.server.server_address[1]}/?cmd=normal&tgt=&ltstring&gt&weight=&ltweight&gt </body></html>'
+                )
+
                 return
             params={}
             try:
@@ -57,9 +58,10 @@ class domain_api(BaseHTTPServer.BaseHTTPRequestHandler):
                 if self.server.verbose: self.server.safe_print ("No Alexa data loaded. Restart program.")
                 self.wfile.write("Alexa not loaded on server. Restart server with -a or --alexa and file path.")
             else:
-                if self.server.verbose: self.server.safe_print ("Alexa queried for:%s" % (params['tgt']))              
+                if self.server.verbose:
+                    self.server.safe_print(f"Alexa queried for:{params['tgt']}")
                 self.wfile.write(str(self.server.alexa.get(params["tgt"],"0")))
-        elif params["cmd"] == "domain" or params["cmd"] == "created":
+        elif params["cmd"] in ["domain", "created"]:
             if params['tgt'] in self.server.cache:
                 print("Found in cache!!")
                 domain_info = self.server.cache.get(params['tgt'])
@@ -68,13 +70,14 @@ class domain_api(BaseHTTPServer.BaseHTTPRequestHandler):
                     print ("Querying the web", params['tgt'])
                     domain_info = whois.whois(params['tgt'])
                     if not domain_info.get('creation_date'):
-                        self.wfile.write(str("No whois record for %s" % (params['tgt'])))
+                        self.wfile.write(str(f"No whois record for {params['tgt']}"))
                         return
                 except Exception as e:
-                    if self.server.verbose: self.server.safe_print ("Error querying whois server: %s" % (str(e)))
-                    
+                    if self.server.verbose:
+                        self.server.safe_print(f"Error querying whois server: {str(e)}")
+
                     return
-            self.server.safe_print("Caching whois record %s" % (str(domain_info)))
+            self.server.safe_print(f"Caching whois record {str(domain_info)}")
             domain_info["time"] = time.time()
             if self.server.alexa:
                 domain_info['alexa'] = self.server.alexa.get(params["tgt"],"0")
@@ -140,21 +143,24 @@ def main():
     server = ThreadedDomainStats((args.address, args.port), domain_api)
     if args.alexa:
         if not os.path.exists(args.alexa):
-            print("Alexa file not found %s" % (args.alexa))
+            print(f"Alexa file not found {args.alexa}")
         else:
             try:
                 server.alexa = dict([(a,b) for b,a in re.findall(r"^(\d+),(.*)", open(args.alexa).read(), re.MULTILINE)])
             except Exception as e:
-                print("Unable to parse alexa file:%s" % (str(e)))
+                print(f"Unable to parse alexa file:{str(e)}")
     server.verbose = args.verbose
     server.cache_time = args.cache_time
     #Schedule the first save interval unless save_interval was set to 0.
     if args.cache_time:
         server.timer = threading.Timer(60 *args.cache_time, server.clear_old_cache, args = ())
         server.timer.start()
- 
+
     #start the server
-    print('Server is Ready. http://%s:%s/?cmd=measure&tgt=astring' % (args.address, args.port))
+    print(
+        f'Server is Ready. http://{args.address}:{args.port}/?cmd=measure&tgt=astring'
+    )
+
     print('[?] - Remember: If you are going to call the api with wget, curl or something else from the bash prompt you need to escape the & with \& \n\n')
     while True:
         try:
@@ -162,7 +168,7 @@ def main():
         except KeyboardInterrupt:
             break
 
-    server.timer.cancel()    
+    server.timer.cancel()
     server.safe_print("Web API Disabled...")
     server.safe_print("Control-C hit: Exiting server.  Please wait..")
 
